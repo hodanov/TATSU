@@ -2,6 +2,8 @@
 
 # TATSU
 
+<img align="right" width="159px" src="tatsu_icon_flying_dragon.png">
+
 > Rise. Protect Your Circulation.
 
 TATSU is a minimalist macOS app that reminds you to stand up regularly.

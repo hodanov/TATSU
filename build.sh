@@ -23,7 +23,7 @@ echo "Building app icon..."
 ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
 rm -rf "$ICONSET_DIR"
 mkdir -p "$ICONSET_DIR"
-SRC_ICON="$SCRIPT_DIR/tatsu_icon_rising_dragon.png"
+SRC_ICON="$SCRIPT_DIR/tatsu_icon_flying_dragon.png"
 sips -z 16 16     "$SRC_ICON" --out "$ICONSET_DIR/icon_16x16.png"      > /dev/null
 sips -z 32 32     "$SRC_ICON" --out "$ICONSET_DIR/icon_16x16@2x.png"   > /dev/null
 sips -z 32 32     "$SRC_ICON" --out "$ICONSET_DIR/icon_32x32.png"      > /dev/null

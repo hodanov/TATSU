@@ -2,6 +2,8 @@
 
 # TATSU
 
+<img align="right" width="159px" src="tatsu_icon_flying_dragon.png">
+
 > 立て。血流を守れ。
 
 TATSUは、定期的に立ち上がることをリマインドするミニマルなmacOSアプリです。
