@@ -14,6 +14,7 @@ swiftc \
   -o "$APP_BUNDLE/Contents/MacOS/TATSU" \
   "$SCRIPT_DIR/TATSU/main.swift" \
   "$SCRIPT_DIR/TATSU/AppDelegate.swift" \
+  "$SCRIPT_DIR/Sources/TATSUCore/TimerModel.swift" \
   -framework Cocoa \
   -framework UserNotifications
 
