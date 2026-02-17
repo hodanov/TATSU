@@ -1,29 +1,14 @@
 import Cocoa
 import UserNotifications
 
-class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, TimerModelDelegate {
 
     private var statusItem: NSStatusItem!
     private var timer: Timer?
-    private var elapsedSeconds = 0
-    private var isPaused = false
-
-    private static let standingPresets = [15, 30, 45, 60]  // 分
-    private static let walkPresets = [30, 60, 90, 120]      // 分
-
-    private static let defaultStandingMinutes = 30
-    private static let defaultWalkMinutes = 60
+    private var model: TimerModel!
 
     private static let standingKey = "standingIntervalMinutes"
     private static let walkKey = "walkIntervalMinutes"
-
-    private var standingInterval: Int {
-        UserDefaults.standard.integer(forKey: Self.standingKey) * 60
-    }
-
-    private var walkInterval: Int {
-        UserDefaults.standard.integer(forKey: Self.walkKey) * 60
-    }
 
     private var pauseMenuItem: NSMenuItem!
     private var stateMenuItem: NSMenuItem!
@@ -35,6 +20,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         registerDefaults()
+
+        let standingMinutes = UserDefaults.standard.integer(forKey: Self.standingKey)
+        let walkMinutes = UserDefaults.standard.integer(forKey: Self.walkKey)
+        model = TimerModel(standingIntervalSeconds: standingMinutes * 60,
+                           walkIntervalSeconds: walkMinutes * 60)
+        model.delegate = self
+
         requestNotificationPermission()
         setupStatusItem()
         startTimer()
@@ -42,8 +34,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     private func registerDefaults() {
         UserDefaults.standard.register(defaults: [
-            Self.standingKey: Self.defaultStandingMinutes,
-            Self.walkKey: Self.defaultWalkMinutes
+            Self.standingKey: TimerModel.defaultStandingMinutes,
+            Self.walkKey: TimerModel.defaultWalkMinutes
         ])
     }
 
@@ -75,24 +67,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "figure.stand", accessibilityDescription: "TATSU")
+            button.image = NSImage(systemSymbolName: model.symbolName, accessibilityDescription: "TATSU")
             button.imagePosition = .imageLeading
-            button.title = formatTime(standingInterval)
+            button.title = model.displayTitle
         }
 
         let menu = NSMenu()
 
-        stateMenuItem = NSMenuItem(title: "着席中", action: nil, keyEquivalent: "")
+        stateMenuItem = NSMenuItem(title: model.menuStateText, action: nil, keyEquivalent: "")
         stateMenuItem.isEnabled = false
         menu.addItem(stateMenuItem)
 
-        timerMenuItem = NSMenuItem(title: "次の通知まで: \(formatTime(standingInterval))", action: nil, keyEquivalent: "")
+        timerMenuItem = NSMenuItem(title: model.menuTimerText, action: nil, keyEquivalent: "")
         timerMenuItem.isEnabled = false
         menu.addItem(timerMenuItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        pauseMenuItem = NSMenuItem(title: "一時停止", action: #selector(togglePause), keyEquivalent: "p")
+        pauseMenuItem = NSMenuItem(title: model.pauseMenuTitle, action: #selector(togglePause), keyEquivalent: "p")
         menu.addItem(pauseMenuItem)
 
         menu.addItem(NSMenuItem(title: "リセット", action: #selector(resetTimer), keyEquivalent: "r"))
@@ -101,7 +93,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
         let standingItem = NSMenuItem(title: "スタンディング間隔", action: nil, keyEquivalent: "")
         standingSubmenu = buildIntervalSubmenu(
-            presets: Self.standingPresets,
+            presets: TimerModel.standingPresets,
             currentMinutes: UserDefaults.standard.integer(forKey: Self.standingKey),
             action: #selector(changeStandingInterval(_:))
         )
@@ -110,7 +102,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
         let walkItem = NSMenuItem(title: "散歩間隔", action: nil, keyEquivalent: "")
         walkSubmenu = buildIntervalSubmenu(
-            presets: Self.walkPresets,
+            presets: TimerModel.walkPresets,
             currentMinutes: UserDefaults.standard.integer(forKey: Self.walkKey),
             action: #selector(changeWalkInterval(_:))
         )
@@ -149,83 +141,65 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let newMinutes = sender.tag
         let walkMinutes = UserDefaults.standard.integer(forKey: Self.walkKey)
 
-        if newMinutes >= walkMinutes {
-            // スタンディング間隔は散歩間隔より短くないといけない
+        guard TimerModel.isValidStandingInterval(newMinutes, walkMinutes: walkMinutes) else {
             return
         }
 
         UserDefaults.standard.set(newMinutes, forKey: Self.standingKey)
+        model.standingIntervalSeconds = newMinutes * 60
         updateSubmenuCheck(standingSubmenu, selectedMinutes: newMinutes)
-        resetTimer()
+        model.reset()
     }
 
     @objc private func changeWalkInterval(_ sender: NSMenuItem) {
         let newMinutes = sender.tag
         let standingMinutes = UserDefaults.standard.integer(forKey: Self.standingKey)
 
-        if newMinutes <= standingMinutes {
-            // 散歩間隔はスタンディング間隔より長くないといけない
+        guard TimerModel.isValidWalkInterval(newMinutes, standingMinutes: standingMinutes) else {
             return
         }
 
         UserDefaults.standard.set(newMinutes, forKey: Self.walkKey)
+        model.walkIntervalSeconds = newMinutes * 60
         updateSubmenuCheck(walkSubmenu, selectedMinutes: newMinutes)
-        resetTimer()
+        model.reset()
     }
 
     // MARK: - Timer
 
     private func startTimer() {
         timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.tick()
+            self?.model.tick()
         }
         RunLoop.current.add(timer!, forMode: .common)
     }
 
-    private func tick() {
-        guard !isPaused else { return }
+    // MARK: - TimerModelDelegate
 
-        elapsedSeconds += 1
-
-        if elapsedSeconds >= walkInterval {
-            sendNotification(title: "散歩しよう！🚶", body: "1時間経ったよ。少し歩いてリフレッシュしよう。")
-            elapsedSeconds = 0
-        } else if elapsedSeconds == standingInterval {
+    func timerModel(_ model: TimerModel, didRequestNotification type: TimerModel.NotificationType) {
+        switch type {
+        case .standing:
             sendNotification(title: "スタンディングに切り替えよう！🧍", body: "30分経ったよ。立ち上がろう。")
+        case .walk:
+            sendNotification(title: "散歩しよう！🚶", body: "1時間経ったよ。少し歩いてリフレッシュしよう。")
         }
+    }
 
+    func timerModelDidUpdateState(_ model: TimerModel) {
         updateDisplay()
     }
 
+    // MARK: - Display Update
+
     private func updateDisplay() {
-        let nextStanding = standingInterval - elapsedSeconds
-        let nextWalk = walkInterval - elapsedSeconds
-        let isStandingPhase = elapsedSeconds >= standingInterval
-
-        let displayTime: Int
-        let symbolName: String
-        let stateText: String
-
-        if isStandingPhase {
-            displayTime = nextWalk
-            symbolName = "figure.stand"
-            stateText = "スタンディング中"
-        } else {
-            displayTime = nextStanding
-            symbolName = "figure.seated.side"
-            stateText = "着席中"
-        }
-
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "TATSU")
-            let prefix = isPaused ? "⏸ " : ""
-            button.title = "\(prefix)\(formatTime(displayTime))"
+            button.image = NSImage(systemSymbolName: model.symbolName, accessibilityDescription: "TATSU")
+            button.title = model.displayTitle
         }
 
-        stateMenuItem.title = isPaused ? "\(stateText)（一時停止中）" : stateText
-        timerMenuItem.title = isStandingPhase
-            ? "散歩まで: \(formatTime(nextWalk))"
-            : "スタンディングまで: \(formatTime(nextStanding))"
+        stateMenuItem.title = model.menuStateText
+        timerMenuItem.title = model.menuTimerText
+        pauseMenuItem.title = model.pauseMenuTitle
     }
 
     // MARK: - Notification
@@ -252,27 +226,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     // MARK: - Menu Actions
 
     @objc private func togglePause() {
-        isPaused.toggle()
-        pauseMenuItem.title = isPaused ? "再開" : "一時停止"
-        updateDisplay()
+        model.togglePause()
     }
 
     @objc private func resetTimer() {
-        elapsedSeconds = 0
-        isPaused = false
-        pauseMenuItem.title = "一時停止"
-        updateDisplay()
+        model.reset()
     }
 
     @objc private func quitApp() {
         NSApplication.shared.terminate(nil)
-    }
-
-    // MARK: - Helpers
-
-    private func formatTime(_ totalSeconds: Int) -> String {
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        return String(format: "%02d:%02d", minutes, seconds)
     }
 }
