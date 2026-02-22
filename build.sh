@@ -21,7 +21,6 @@ swiftc \
 
 cp "$SCRIPT_DIR/TATSU/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 cp "$SCRIPT_DIR/tatsu_icon_flying_dragon.png" "$APP_BUNDLE/Contents/Resources/tatsu_icon_flying_dragon.png"
-cp "$SCRIPT_DIR/Subject.png" "$APP_BUNDLE/Contents/Resources/Subject.png"
 
 echo "Building app icon..."
 ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"

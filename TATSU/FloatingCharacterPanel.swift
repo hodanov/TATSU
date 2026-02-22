@@ -77,9 +77,14 @@ class FloatingCharacterPanel: NSPanel {
     }
 
     private func loadImage() {
-        if let path = Bundle.main.path(forResource: "Subject", ofType: "png") {
+        if let path = Bundle.main.path(forResource: "tatsu_icon_flying_dragon", ofType: "png") {
             imageView.image = NSImage(contentsOfFile: path)
         }
+        resizePanel()
+    }
+
+    func updateImage(path: String) {
+        imageView.image = NSImage(contentsOfFile: path)
         resizePanel()
     }
 
