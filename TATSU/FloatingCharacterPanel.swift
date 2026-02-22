@@ -127,7 +127,7 @@ class FloatingCharacterPanel: NSPanel {
             self.dismissWorkItem?.cancel()
             let item = DispatchWorkItem { [weak self] in self?.dismiss() }
             self.dismissWorkItem = item
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: item)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: item)
         }
     }
 
