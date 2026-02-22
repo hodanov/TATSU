@@ -14,11 +14,14 @@ swiftc \
   -o "$APP_BUNDLE/Contents/MacOS/TATSU" \
   "$SCRIPT_DIR/TATSU/main.swift" \
   "$SCRIPT_DIR/TATSU/AppDelegate.swift" \
+  "$SCRIPT_DIR/TATSU/FloatingCharacterPanel.swift" \
   "$SCRIPT_DIR/Sources/TATSUCore/TimerModel.swift" \
   -framework Cocoa \
   -framework UserNotifications
 
 cp "$SCRIPT_DIR/TATSU/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+cp "$SCRIPT_DIR/tatsu_icon_flying_dragon.png" "$APP_BUNDLE/Contents/Resources/tatsu_icon_flying_dragon.png"
+cp "$SCRIPT_DIR/Subject.png" "$APP_BUNDLE/Contents/Resources/Subject.png"
 
 echo "Building app icon..."
 ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"

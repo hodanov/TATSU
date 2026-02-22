@@ -183,6 +183,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         case .walk:
             sendNotification(title: "散歩しよう！🚶", body: "1時間経ったよ。少し歩いてリフレッシュしよう。")
         }
+        FloatingCharacterPanel.shared.show(for: type)
     }
 
     func timerModelDidUpdateState(_ model: TimerModel) {
