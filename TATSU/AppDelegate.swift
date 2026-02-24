@@ -1,4 +1,5 @@
 import Cocoa
+import UniformTypeIdentifiers
 import UserNotifications
 
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, TimerModelDelegate {
@@ -9,8 +10,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     private static let standingKey = "standingIntervalMinutes"
     private static let walkKey = "walkIntervalMinutes"
+    private static let characterImageKey = "characterImageName"
+    private static let floatingPanelEnabledKey = "floatingPanelEnabled"
 
     private var pauseMenuItem: NSMenuItem!
+    private var floatingPanelMenuItem: NSMenuItem!
     private var stateMenuItem: NSMenuItem!
     private var timerMenuItem: NSMenuItem!
     private var standingSubmenu: NSMenu!
@@ -30,12 +34,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         requestNotificationPermission()
         setupStatusItem()
         startTimer()
+
+        if let savedPath = UserDefaults.standard.string(forKey: Self.characterImageKey) {
+            FloatingCharacterPanel.shared.updateImage(path: savedPath)
+        }
     }
 
     private func registerDefaults() {
         UserDefaults.standard.register(defaults: [
             Self.standingKey: TimerModel.defaultStandingMinutes,
-            Self.walkKey: TimerModel.defaultWalkMinutes
+            Self.walkKey: TimerModel.defaultWalkMinutes,
+            Self.floatingPanelEnabledKey: false
         ])
     }
 
@@ -109,6 +118,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         walkItem.submenu = walkSubmenu
         menu.addItem(walkItem)
 
+        floatingPanelMenuItem = NSMenuItem(
+            title: "通知画像を表示",
+            action: #selector(toggleFloatingPanel),
+            keyEquivalent: ""
+        )
+        floatingPanelMenuItem.state = UserDefaults.standard.bool(forKey: Self.floatingPanelEnabledKey) ? .on : .off
+        menu.addItem(floatingPanelMenuItem)
+
+        menu.addItem(NSMenuItem(
+            title: "通知画像を選択...",
+            action: #selector(selectCharacterImage),
+            keyEquivalent: ""
+        ))
+
         menu.addItem(NSMenuItem.separator())
 
         menu.addItem(NSMenuItem(title: "終了", action: #selector(quitApp), keyEquivalent: "q"))
@@ -165,6 +188,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         model.reset()
     }
 
+    @objc private func toggleFloatingPanel() {
+        let newValue = !UserDefaults.standard.bool(forKey: Self.floatingPanelEnabledKey)
+        UserDefaults.standard.set(newValue, forKey: Self.floatingPanelEnabledKey)
+        floatingPanelMenuItem.state = newValue ? .on : .off
+    }
+
+    @objc private func selectCharacterImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .tiff, .gif]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { result in
+            guard result == .OK, let url = panel.url else { return }
+            UserDefaults.standard.set(url.path, forKey: Self.characterImageKey)
+            FloatingCharacterPanel.shared.updateImage(path: url.path)
+        }
+    }
+
     // MARK: - Timer
 
     private func startTimer() {
@@ -177,11 +220,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     // MARK: - TimerModelDelegate
 
     func timerModel(_ model: TimerModel, didRequestNotification type: TimerModel.NotificationType) {
-        switch type {
-        case .standing:
-            sendNotification(title: "スタンディングに切り替えよう！🧍", body: "30分経ったよ。立ち上がろう。")
-        case .walk:
-            sendNotification(title: "散歩しよう！🚶", body: "1時間経ったよ。少し歩いてリフレッシュしよう。")
+        if UserDefaults.standard.bool(forKey: Self.floatingPanelEnabledKey) {
+            FloatingCharacterPanel.shared.show(for: type)
+        } else {
+            switch type {
+            case .standing:
+                sendNotification(title: "スタンディングに切り替えよう！🧍", body: "30分経ったよ。立ち上がろう。")
+            case .walk:
+                sendNotification(title: "散歩しよう！🚶", body: "1時間経ったよ。少し歩いてリフレッシュしよう。")
+            }
         }
     }
 
